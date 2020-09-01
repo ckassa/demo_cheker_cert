@@ -16,9 +16,21 @@ import hashlib
 s = requests.Session()
 sert_path = 'src' + os.sep + 'cert.pem'
 key_path = 'src' + os.sep + 'dec.key'
-# Приватный ключ через тектсовик я вытащил из серта p12, затем командой
+# Приватный ключ через тектсовик я вытащил из серта pem, затем командой
 # "openssl rsa -in my.key_encrypted -out my.key_decrypted" (со вводом пароля) расшифровал закрытый ключ
 s.cert = (sert_path, key_path)
+
+
+def init_driver():
+    # Задаем параметры
+    cd_path = 'src/chromedriver'
+    options = Options()
+    options.add_argument('--headless')  # скрывать окна хрома
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(cd_path, options=options)
+    driver.implicitly_wait(30)  # неявное ожидание драйвера
+    return driver
 
 
 def create_anonimus_pay():
@@ -57,29 +69,22 @@ def create_anonimus_pay():
 
 def payment_of_the_created_anonymous_pay():
     payUrl = create_anonimus_pay()
-    cd_dir_path = 'src' + os.sep + 'chromedriver'
-    chrome_options = Options()  # задаем параметры запуска драйвера, чтоб не крашился (когда работает во много потоков)
-    chrome_options.add_argument('--headless')  # скрывать окна хрома
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    #chrome_options.add_argument("--window-size=1980,1024")
-    driver = webdriver.Chrome(cd_dir_path, chrome_options=chrome_options)
-    driver.implicitly_wait(30)  # неявное ожидание драйвера
+    driver = init_driver()
     wait = WebDriverWait(driver, 3)  # Задал переменную, чтоб настроить явное ожидание элемента (сек)
+
     print('check payment_of_the_created_anonymous_pay...', end='')
     driver.get(payUrl)
+    # Ввожу номер карты в 4 подхода, т.к. если вводить слишком быстро, то форма ломается
+    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#pan'))).send_keys('4000')
+    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#pan'))).send_keys('0000')
+    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#pan'))).send_keys('0000')
+    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#pan'))).send_keys('0002')
+    # Тоже в 2 подхода, чтоб не сломать форму
+    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#exp'))).send_keys('01')
+    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#exp'))).send_keys('21')
 
-    pan = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#pan')))
-    pan.send_keys(f'{config.pan}')
-
-    exp = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="exp"]')))
-    exp.send_keys(f'{config.exp}')
-
-    card_owner = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="holder"]')))
-    card_owner.send_keys(f'{config.card_owner}')
-
-    cvv = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="secret"]')))
-    cvv.send_keys(f'{config.cvv}')
+    wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="holder"]'))).send_keys(f'{config.card_owner}')
+    wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="secret"]'))).send_keys(f'{config.cvv}')
 
     wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="buttonpay"]'))).click()
     # парсим текст результата оплаты
@@ -135,7 +140,37 @@ def card_registration_rek():
         r = s.post(url, data=json.dumps(payload), headers=headers)
         request = r.json()
         registration_url = request['payUrl']
-        print(f'registration_url: {registration_url}')
+        if registration_url:
+            driver = init_driver()
+            driver.get(registration_url)
+            wait = WebDriverWait(driver, 3)  # Явное ожидание элемента (сек)
+            # Ввожу номер карты в 4 подхода, т.к. если вводить слишком быстро, то форма ломается
+            wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#pan'))).send_keys('4000')
+            wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#pan'))).send_keys('0000')
+            wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#pan'))).send_keys('0000')
+            wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#pan'))).send_keys('0002')
+            # Тоже в 2 подхода, чтоб не сломать форму
+            wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#exp'))).send_keys('01')
+            wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#exp'))).send_keys('21')
+
+            wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="holder"]'))).send_keys(f'{config.card_owner}')
+            wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="secret"]'))).send_keys(f'{config.cvv}')
+            wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="buttonpay"]'))).click()
+            registration_result = wait.until(EC.element_to_be_clickable((By.XPATH, '/html/body/div/div[2]/div/div/span'))).get_attribute(
+                'innerHTML')
+            if registration_result == 'Ваша карта успешно зарегистрирована':
+                print('OK')
+            else:
+                print(f'Something wrong! registration_result: {registration_result}')
+            driver.quit()
+
+            # После успешной регистрации вытаскиваем cardToken и запускаем функцию отвязки карты
+            cards = get_cards_rek()
+            cardToken = cards[0]['cardToken']
+            card_deactivation_rek(cardToken)
+
+        else:
+            print(f"Can't get registration_url. Request: {request}")
 
 
 def card_deactivation_rek(cardToken):
@@ -162,6 +197,8 @@ def card_deactivation_rek(cardToken):
 
 
 if __name__ == '__main__':
-    payment_of_the_created_anonymous_pay()
-    card_registration_rek()
-    #card_deactivation_rek()
+    try:
+        payment_of_the_created_anonymous_pay()
+        card_registration_rek()
+    except KeyboardInterrupt:
+        print('Program has been stop manually')
