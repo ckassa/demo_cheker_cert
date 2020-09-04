@@ -19,7 +19,7 @@ def create_anonimus_pay():
     url = config.anonimus_pay_url
     payload = {
         "sign": "16088965AB36DAA41E401BD948E13BBC",
-        "serviceCode": "1000-13864-2",
+        "serviceCode": f"{config.service_code}",
         "amount": "2500",
         "comission": "0",
         "properties": [
@@ -31,7 +31,7 @@ def create_anonimus_pay():
         "shopToken": "1a4c0d33-010c-4365-9c65-4c7f9bb415d5"
     }
     # Рассчет подписи
-    sign_str = payload['serviceCode'] + '&' + payload['amount'] + '&' + payload['comission'] + '&' + payload['properties'][0]['name'] + '&' + payload['properties'][0]['value'] + '&' + payload['shopToken'] +  '&' + config.sec_key
+    sign_str = payload['serviceCode'] + '&' + payload['amount'] + '&' + payload['comission'] + '&' + payload['properties'][0]['name'] + '&' + payload['properties'][0]['value'] + '&' + payload['shopToken'] + '&' + config.sec_key
     pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign

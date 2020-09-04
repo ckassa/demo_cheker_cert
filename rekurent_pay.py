@@ -12,6 +12,7 @@ key_path = 'src' + os.sep + 'dec.key'
 # Приватный ключ через тектсовик я вытащил из серта pem, затем командой
 # "openssl rsa -in my.key_encrypted -out my.key_decrypted" (со вводом пароля) расшифровал закрытый ключ
 s.cert = (sert_path, key_path)
+user = {}  # Для записи локальны переменных в глобальную
 
 
 def user_registration():
@@ -34,13 +35,13 @@ def user_registration():
         'Content-Type': 'application/json',
         "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0",
     }
-    request = s.post(url, data=json.dumps(payload), headers=headers).json() # тут есть login, userToken
+    request = s.post(url, data=json.dumps(payload), headers=headers).json()  # тут есть login, userToken
 
     if request['login'] == login:
         print('OK')
     else:
         print(f'Something wrong! url: {url}, request: {request}')
-    get_user_status(login)
+    user['login'] = login
 
 
 def get_user_status(login):
@@ -65,7 +66,7 @@ def get_user_status(login):
     else:
         print(f'Something wrong! url: {url}, request: {request}')
     userToken = request['userToken']
-    get_cards_rek(userToken)
+    user['userToken'] = userToken  # Записываем в глобальную переменную
 
 
 def get_cards_rek(userToken):
@@ -76,6 +77,7 @@ def get_cards_rek(userToken):
         "userToken": f"{userToken}",
         "shopToken": f"{config.shopToken}"
     }
+
     # Рассчет подписи
     sign_str = payload['userToken'] + '&' + payload['shopToken'] + '&' + config.sec_key
     pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
@@ -85,11 +87,11 @@ def get_cards_rek(userToken):
     request = s.post(url, data=json.dumps(payload), headers=headers).json()
     print('Check method /get/cards...', end='')
     cards = request['cards']
+    user['cards'] = cards  # Записал в глобальную переменную
     if cards != '':
         print('OK')
     else:
         print(f'Something wrong! url: {url} request: {request}')
-    card_registration(userToken)
 
 
 def card_registration(userToken):
@@ -111,7 +113,6 @@ def card_registration(userToken):
 
     registration_url = request['payUrl']
     order = registration_url.replace('https://demo-acq.bisys.ru/cardpay/card?order=', '')
-
 
     # Открываем payUrl чтоб перехватить Cookies
     s.get(registration_url, headers=headers)
@@ -143,9 +144,78 @@ def card_registration(userToken):
         print(f'Something wrong! url: {url} request: {reg_request}')
 
 
+def do_payment():
+
+    url = config.do_payment_rek_url
+    headers = {'Content-Type': 'application/json'}
+    cardToken = user['cards'][0]['cardToken']  # Берем первую привязанную карту
+    payload = {
+        "sign": "C5A5386EBADC3D0574CCB7A81820698A",
+        "serviceCode": f"{config.service_code}",
+        "userToken": f"{user['userToken']}",
+        "amount": "2500",
+        "comission": "0",
+        "cardToken": f"{cardToken}",  # берем первую привязанную карту
+        "holdTtl": "1800",
+        "properties": [
+            {
+                "name": "ПОЗЫВНОЙ",
+                "value": f"{random.randint(10, 20)}"
+            }
+        ],
+        "shopToken": f"{config.shopToken}"
+    }
+    # Рассчет подписи
+    sign_str = payload['serviceCode'] + '&' + payload['userToken'] + '&' + payload['amount'] + '&' + payload['comission'] + '&' + payload['cardToken'] + '&' + payload['holdTtl'] + '&' + payload['properties'][0]['name'] + '&' + payload['properties'][0]['value'] + '&' + payload['shopToken'] + '&' + config.sec_key
+    pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
+    sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
+    payload['sign'] = sign
+    print('Check method /do/payment...', end='')
+    request = (s.post(url, data=json.dumps(payload), headers=headers)).json()
+    regPayNum = request['regPayNum']
+    print(request)
+    user['regPayNum'] = regPayNum  # Записал в глобальную переменную
+    if regPayNum:
+        print('OK')
+    else:
+        print(f'Something wrong! url: {url} request: {request}')
 
 
-user_registration()
-#card_registration('52771f3b-aa0e-42e1-855e-d0f0b80339e4')
-#'login': '79024782366'
-#'userToken': '52771f3b-aa0e-42e1-855e-d0f0b80339e4'
+def confirm_pay():
+    url = config.confirm_pay_rek_url
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "sign": "C5A5386EBADC3D0574CCB7A81820698A",
+        "regPayNum": f"{user['regPayNum']}",
+        "orderId": f"{random.randint(1000000, 2000000)}",
+        "shopToken": f"{config.shopToken}"
+    }
+    # Рассчет подписи
+    sign_str = payload['regPayNum'] + '&' + payload['orderId'] + '&' + payload['shopToken'] + '&' + config.sec_key
+    pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
+    sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
+    payload['sign'] = sign
+
+    print('Check method /provision-services/confirm...', end='')
+    request = (s.post(url, data=payload, headers=headers)).json()
+    print(request)
+
+
+if __name__ == '__main__':
+    user_registration()
+    get_user_status(login=user['login'])
+    card_registration(userToken=user['userToken'])
+    time.sleep(4)  # Если не взять паузу, то autopays не успевает записать привязанную карту и возвращает пустой массив с картами
+    get_cards_rek(userToken=user['userToken'])
+    do_payment()
+    time.sleep(4)
+    confirm_pay()
+
+
+
+# print(user)
+# print(user['userToken'])
+
+# card_registration('52771f3b-aa0e-42e1-855e-d0f0b80339e4')
+# 'login': '79024782366'
+# 'userToken': '52771f3b-aa0e-42e1-855e-d0f0b80339e4'
