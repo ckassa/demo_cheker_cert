@@ -15,7 +15,7 @@ s.cert = (sert_path, key_path)
 
 
 def create_anonimus_pay():
-    print('Check method "/do/payment/anonymous"...', end='')
+    print('Check method /do/payment/anonymous...', end='')
     url = config.anonimus_pay_url
     payload = {
         "sign": "16088965AB36DAA41E401BD948E13BBC",

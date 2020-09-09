@@ -5,6 +5,7 @@ from src import config
 import time
 import hashlib
 import random
+from datetime import datetime
 
 s = requests.Session()
 sert_path = 'src' + os.sep + 'cert.pem'
@@ -12,7 +13,8 @@ key_path = 'src' + os.sep + 'dec.key'
 # Приватный ключ через тектсовик я вытащил из серта pem, затем командой
 # "openssl rsa -in my.key_encrypted -out my.key_decrypted" (со вводом пароля) расшифровал закрытый ключ
 s.cert = (sert_path, key_path)
-user = {}  # Для записи локальны переменных в глобальную
+user = {}  # Для записи локальных переменных в глобальную
+json_headers = {'Content-Type': 'application/json'}
 
 
 def user_registration():
@@ -31,11 +33,7 @@ def user_registration():
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
 
-    headers = {
-        'Content-Type': 'application/json',
-        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0",
-    }
-    request = s.post(url, data=json.dumps(payload), headers=headers).json()  # тут есть login, userToken
+    request = s.post(url, data=json.dumps(payload), headers=json_headers).json()  # тут есть login, userToken
 
     if request['login'] == login:
         print('OK')
@@ -46,7 +44,6 @@ def user_registration():
 
 def get_user_status(login):
     print('Check method /user/status...', end='')
-    headers = {'Content-Type': 'application/json'}
     url = config.user_status_rek_url
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
@@ -59,7 +56,7 @@ def get_user_status(login):
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
 
-    request = s.post(url, data=json.dumps(payload), headers=headers).json()
+    request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
 
     if request['login'] == login and request['state'] == 'active':
         print('OK')
@@ -70,7 +67,6 @@ def get_user_status(login):
 
 
 def get_cards_rek(userToken):
-    headers = {'Content-Type': 'application/json'}
     url = config.get_cards_rek_url
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
@@ -84,7 +80,7 @@ def get_cards_rek(userToken):
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
 
-    request = s.post(url, data=json.dumps(payload), headers=headers).json()
+    request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
     print('Check method /get/cards...', end='')
     cards = request['cards']
     user['cards'] = cards  # Записал в глобальную переменную
@@ -96,7 +92,7 @@ def get_cards_rek(userToken):
 
 def card_registration(userToken):
     print('Check method /card/registration...', end='')
-    headers = {'Content-Type': 'application/json'}
+
     url = config.card_registration_url_rek
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
@@ -109,13 +105,13 @@ def card_registration(userToken):
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
 
-    request = s.post(url, data=json.dumps(payload), headers=headers).json()
+    request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
 
     registration_url = request['payUrl']
     order = registration_url.replace('https://demo-acq.bisys.ru/cardpay/card?order=', '')
 
     # Открываем payUrl чтоб перехватить Cookies
-    s.get(registration_url, headers=headers)
+    s.get(registration_url, headers=json_headers)
     cookies = s.cookies.get_dict()
 
     reg_payload = {
@@ -147,7 +143,6 @@ def card_registration(userToken):
 def do_payment():
 
     url = config.do_payment_rek_url
-    headers = {'Content-Type': 'application/json'}
     cardToken = user['cards'][0]['cardToken']  # Берем первую привязанную карту
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
@@ -156,7 +151,7 @@ def do_payment():
         "amount": "2500",
         "comission": "0",
         "cardToken": f"{cardToken}",  # берем первую привязанную карту
-        "holdTtl": "1800",
+        "holdTtl": "345600",
         "properties": [
             {
                 "name": "ПОЗЫВНОЙ",
@@ -171,9 +166,9 @@ def do_payment():
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
     print('Check method /do/payment...', end='')
-    request = (s.post(url, data=json.dumps(payload), headers=headers)).json()
+    request = (s.post(url, data=json.dumps(payload), headers=json_headers)).json()
     regPayNum = request['regPayNum']
-    print(request)
+
     user['regPayNum'] = regPayNum  # Записал в глобальную переменную
     if regPayNum:
         print('OK')
@@ -183,7 +178,7 @@ def do_payment():
 
 def confirm_pay():
     url = config.confirm_pay_rek_url
-    headers = {'Content-Type': 'application/json'}
+
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
         "regPayNum": f"{user['regPayNum']}",
@@ -197,25 +192,88 @@ def confirm_pay():
     payload['sign'] = sign
 
     print('Check method /provision-services/confirm...', end='')
-    request = (s.post(url, data=payload, headers=headers)).json()
-    print(request)
+    request = (s.post(url, data=json.dumps(payload), headers=json_headers)).json()
+    result = request['resultState']
+    if result == 'success':
+        user['payment_state'] = result
+        print('OK')
+    else:
+        print(f'Something wrong! url: {url} request: {request}')
 
 
-if __name__ == '__main__':
-    user_registration()
-    get_user_status(login=user['login'])
-    card_registration(userToken=user['userToken'])
-    time.sleep(4)  # Если не взять паузу, то autopays не успевает записать привязанную карту и возвращает пустой массив с картами
-    get_cards_rek(userToken=user['userToken'])
+def get_pay_state():
+    url = config.get_pay_state_url
+    payload = {
+        "sign": "C5A5386EBADC3D0574CCB7A81820698A",
+        "regPayNum": f"{user['regPayNum']}",
+        "shopToken": f"{config.shopToken}"
+    }
+    # Рассчет подписи
+    sign_str = payload['regPayNum'] + '&' + payload['shopToken'] + '&' + config.sec_key
+    pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
+    sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
+    payload['sign'] = sign
+
+    print("Check method /payment/state...", end='')
+    request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
+    payment_state = request['state']
+    if payment_state:
+        print('OK')
+        user['payment_state'] = payment_state
+    else:
+        print(f'Something wrong! url: {url} request: {request}')
+
+
+def refund_payment():
+    url = config.refund_rek_url
+    # Сначала выполняем функцию создания платежа с указанием holdttl
+    # будет новый regPayNum, он перезапишется в глобальный словарь user
     do_payment()
-    time.sleep(4)
-    confirm_pay()
+    # таймаут 3 секунды, иначе возвращается статус created
+    time.sleep(3)
+
+    payload = {
+        "sign": "C5A5386EBADC3D0574CCB7A81820698A",
+        "regPayNum": f"{user['regPayNum']}",
+        "orderId": f"{random.randint(10, 20)}",
+        "shopToken": f"{config.shopToken}"
+    }
+    # Рассчет подписи
+    sign_str = payload['regPayNum'] + '&' + payload['orderId'] + '&' + payload['shopToken'] + '&' + config.sec_key
+    #print(f'userToken: {payload["userToken"]}\ncardToken: {payload["cardToken"]}\nshopToken: {payload["shopToken"]}')
+    pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
+    sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
+    payload['sign'] = sign
+    print('Check method /provision-services/refund...', end='')
+    request = (s.post(url, data=json.dumps(payload), headers=json_headers)).json()
+    result = request['resultState']
+    if result == 'success':
+        print('OK')
+    else:
+        print(f'Something wrong! url: {url} request: {request}')
 
 
+def card_deactivation():
+    url = config.card_deactivation_url
+    payload = {
+        "sign": "C5A5386EBADC3D0574CCB7A81820698A",
+        "userToken": f"{user['userToken']}",
+        "shopToken": f"{config.shopToken}",
+        "cardToken": f"{user['cards'][0]['cardToken']}"
+    }
 
-# print(user)
-# print(user['userToken'])
+    # Рассчет подписи
+    sign_str = payload['userToken'] + '&' + payload['cardToken'] + '&' + payload['shopToken'] + '&' + config.sec_key
+    #print(f'userToken: {payload["userToken"]}\ncardToken: {payload["cardToken"]}\nshopToken: {payload["shopToken"]}')
+    pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
+    sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
+    payload['sign'] = sign
+    print('Check method /card/deatcivation...', end='')
+    request = (s.post(url, data=json.dumps(payload), headers=json_headers)).json()
+    result = request['resultState']
+    if result == 'success':
+        print('OK')
+    else:
+        print(f'Something wrong! url: {url} request: {request}')
 
-# card_registration('52771f3b-aa0e-42e1-855e-d0f0b80339e4')
-# 'login': '79024782366'
-# 'userToken': '52771f3b-aa0e-42e1-855e-d0f0b80339e4'
+
