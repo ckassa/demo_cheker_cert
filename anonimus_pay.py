@@ -63,7 +63,7 @@ def create_anonimus_pay():
 
 
 def payment_created_pay():
-    print('Payment created pay...')
+    print('Trying to payment created pay')
     created_pay_data = create_anonimus_pay()
     payUrl = created_pay_data[0]
     regPayNum = created_pay_data[1]
@@ -99,7 +99,7 @@ def check_pay_status(regPayNum):
     payload = {
         "sign": "AE13A1572E1A3594A0A956EB751D7F6D",
         "regPayNum": f"{regPayNum}",
-        "shopToken": "1a4c0d33-010c-4365-9c65-4c7f9bb415d5"
+        "shopToken": f"{config.shopToken}"
     }
     headers = {
         "Content-Type": "application/json"
@@ -112,14 +112,14 @@ def check_pay_status(regPayNum):
     r = s.post(url, data=json.dumps(payload), headers=headers)
     request = r.json()
     payment_state = request['state']
-    global try_number
-    try_number = 0
     if payment_state == 'payed':
         print('OK')
-    elif payment_state == 'created' and try_number <= 10:
-        try_number += 1
-        print(f'Payment state: {payment_state}. Try number {try_number}')
+    elif payment_state == 'created':
+        print(f'Payment state: {payment_state}. Retry...')
         time.sleep(10)
         check_pay_status(regPayNum)
     else:
         print(f'Something wrong! payment state: {payment_state}')
+
+
+

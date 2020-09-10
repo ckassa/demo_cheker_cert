@@ -42,12 +42,12 @@ def user_registration():
     user['login'] = login
 
 
-def get_user_status(login):
+def get_user_status():
     print('Check method /user/status...', end='')
     url = config.user_status_rek_url
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
-        "login": f"{login}",
+        "login": f"{user['login']}",
         "shopToken": f"{config.shopToken}"
     }
     # Рассчет подписи
@@ -58,7 +58,7 @@ def get_user_status(login):
 
     request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
 
-    if request['login'] == login and request['state'] == 'active':
+    if request['state'] == 'active':
         print('OK')
     else:
         print(f'Something wrong! url: {url}, request: {request}')
@@ -66,11 +66,11 @@ def get_user_status(login):
     user['userToken'] = userToken  # Записываем в глобальную переменную
 
 
-def get_cards_rek(userToken):
+def get_cards_rek():
     url = config.get_cards_rek_url
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
-        "userToken": f"{userToken}",
+        "userToken": f"{user['userToken']}",
         "shopToken": f"{config.shopToken}"
     }
 
@@ -90,13 +90,13 @@ def get_cards_rek(userToken):
         print(f'Something wrong! url: {url} request: {request}')
 
 
-def card_registration(userToken):
+def card_registration():
     print('Check method /card/registration...', end='')
 
     url = config.card_registration_url_rek
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
-        "userToken": f"{userToken}",
+        "userToken": f"{user['userToken']}",
         "shopToken": f"{config.shopToken}"
     }
     # Рассчет подписи
@@ -143,7 +143,11 @@ def card_registration(userToken):
 def do_payment():
 
     url = config.do_payment_rek_url
-    cardToken = user['cards'][0]['cardToken']  # Берем первую привязанную карту
+    try:
+        cardToken = user['cards'][0]['cardToken']  # Берем первую привязанную карту
+    except IndexError:
+        print('IndexError... No cards. Start method /card/registration...')
+        card_registration()
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
         "serviceCode": f"{config.service_code}",
