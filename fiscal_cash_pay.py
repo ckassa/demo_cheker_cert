@@ -1,4 +1,4 @@
-from src import config
+from .src import config
 import json
 import hashlib
 import random
@@ -7,16 +7,18 @@ import os
 import time
 
 s = requests.Session()
-sert_path = 'src' + os.sep + 'cert.pem'
-key_path = 'src' + os.sep + 'dec.key'
+sert_path = 'extentions/demo_checker/src/cert.pem'
+key_path = 'extentions/demo_checker/src/dec.key'
 # Приватный ключ через тектсовик я вытащил из серта pem, затем командой
 # "openssl rsa -in my.key_encrypted -out my.key_decrypted" (со вводом пароля) расшифровал закрытый ключ
 s.cert = (sert_path, key_path)
 user = {}
+output = []
 
 
 def create_anonimus_pay():
-    print('Check method /do/payment/anonymous...', end='')
+    #print('Check method /do/payment/anonymous...', end='')
+    output.append('/do/payment/anonymous...')
     url = config.anonimus_pay_url
     payload = {
         "sign": "16088965AB36DAA41E401BD948E13BBC",
@@ -55,14 +57,17 @@ def create_anonimus_pay():
     regPayNum = request['regPayNum']
     user['regPayNum'] = regPayNum
     if regPayNum != '':
-        print('OK')
+        #print('OK')
+        output.append('OK\n')
     else:
-        print(f'Something wrong! Key Error. Url: {url}, request: {request}')
+        #print(f'Something wrong! Key Error. Url: {url}, request: {request}')
+        output.append(f'Something wrong! Key Error. Url: {url}, request: {request}\n')
 
 
 def check_pay_status():
     url = config.payment_state_url
-    print('Check payment state...', end='')
+    #print('Check payment state...', end='')
+    output.append('Check payment state...')
     payload = {
         "sign": "AE13A1572E1A3594A0A956EB751D7F6D",
         "regPayNum": f"{user['regPayNum']}",
@@ -80,13 +85,16 @@ def check_pay_status():
     request = r.json()
     payment_state = request['state']
     if payment_state == 'payed':
-        print('OK')
+        #print('OK')
+        output.append('OK\n')
     elif payment_state == 'created':
-        print(f' Warn: Payment state: {payment_state}. Retry...')
+        #print(f' Warn: Payment state: {payment_state}. Retry...')
+        output.append(f' Warn: Payment state: {payment_state}. Retry...\n')
         time.sleep(5)
         check_pay_status()
     else:
-        print(f'Something wrong! payment state: {payment_state} Request: {request}')
+        #print(f'Something wrong! payment state: {payment_state} Request: {request}')
+        output.append(f'Something wrong! payment state: {payment_state} Request: {request}\n')
 
 
 def get_fiscal_check():
@@ -104,17 +112,15 @@ def get_fiscal_check():
     pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
-    print('Check method /receipt-fiscal...', end='')
+    #print('Check method /receipt-fiscal...', end='')
+    output.append('/receipt-fiscal...')
     r = s.post(url, data=json.dumps(payload), headers=headers)
     request = r.json()
     fiscal_url = request['fiscalUrl']
     if fiscal_url:
-        print(f'OK. Fiscal url: {fiscal_url}')
+        #print(f'OK')
+        output.append('OK\n')
     else:
-        print(f'Something wrong! Key Error. Url: {url}, request: {request}')
+        #print(f'Something wrong! Key Error. Url: {url}, request: {request}')
+        output.append(f'Something wrong! Key Error. Url: {url}, request: {request}\n')
 
-
-if __name__ == '__main__':
-    create_anonimus_pay()
-    check_pay_status()
-    get_fiscal_check()

@@ -1,21 +1,25 @@
 import requests
 import json
 import os
-from src import config
+from .src import config
 import time
 import hashlib
 import random
+from extentions.demo_checker import app
+
 
 s = requests.Session()
-sert_path = 'src' + os.sep + 'cert.pem'
-key_path = 'src' + os.sep + 'dec.key'
+sert_path = 'extentions/demo_checker/src/cert.pem'
+key_path = 'extentions/demo_checker/src/dec.key'
 # Приватный ключ через тектсовик я вытащил из серта pem, затем командой
 # "openssl rsa -in my.key_encrypted -out my.key_decrypted" (со вводом пароля) расшифровал закрытый ключ
 s.cert = (sert_path, key_path)
+output = ['\nCheck anonimus payment methods:\n\n']
 
 
 def create_anonimus_pay():
-    print('Check method /do/payment/anonymous...', end='')
+    #print('Check method /do/payment/anonymous...', end='')
+    output.append('/do/payment/anonymous...')
     url = config.anonimus_pay_url
     payload = {
         "sign": "16088965AB36DAA41E401BD948E13BBC",
@@ -49,13 +53,16 @@ def create_anonimus_pay():
         payUrl = request['payUrl']
         methodType = request['methodType']
     except KeyError:
-        print(f'Something wrong! Key Error. Url: {url}, request: {request}')
+        #print(f'Something wrong! Key Error. Url: {url}, request: {request}')
+        output.append(f'Something wrong! Except Key Error. Url: {url}, request: {request}\n')
 
     #print(f'sign: {sign}\nshopToken: {shopToken}\nregPayNum: {regPayNum}\npayurl: {payurl}\nmethodType: {methodType}')
     if sign != '' and methodType == 'GET' and shopToken != '' and 'https://demo-acq.bisys.ru/cardpay/card?order=' in payUrl and regPayNum != '':
-        print('OK')
+        #print('OK')
+        output.append('OK\n')
     else:
-        print(f'Something wrong!\nrequest_status_code: {r.status_code}\nrequest: {request}')
+        #print(f'Something wrong!\nrequest_status_code: {r.status_code}\nrequest: {request}')
+        output.append(f'Something wrong!\nrequest_status_code: {r.status_code}\nrequest: {request}\n')
     # Открываем полученную ссылку, чтоб перехватить Cookies
     s.get(payUrl, headers=headers)
     cookies = s.cookies.get_dict()
@@ -63,7 +70,8 @@ def create_anonimus_pay():
 
 
 def payment_created_pay():
-    print('Trying to payment created pay')
+    #print('Trying to payment created pay')
+    output.append('Trying to payment created pay...\n')
     created_pay_data = create_anonimus_pay()
     payUrl = created_pay_data[0]
     regPayNum = created_pay_data[1]
@@ -95,7 +103,8 @@ def payment_created_pay():
 
 def check_pay_status(regPayNum):
     url = config.payment_state_url
-    print('Check payment state...', end='')
+    #print('Check payment state...', end='')
+    output.append('Check payment state...')
     payload = {
         "sign": "AE13A1572E1A3594A0A956EB751D7F6D",
         "regPayNum": f"{regPayNum}",
@@ -113,13 +122,16 @@ def check_pay_status(regPayNum):
     request = r.json()
     payment_state = request['state']
     if payment_state == 'payed':
-        print('OK')
+        #print('OK\n')
+        output.append('OK\n')
     elif payment_state == 'created':
-        print(f'Payment state: {payment_state}. Retry...')
+        output.append(f'Payment state: {payment_state}. Retry...\n')
+        #print(f'Payment state: {payment_state}. Retry...')
         time.sleep(10)
         check_pay_status(regPayNum)
     else:
-        print(f'Something wrong! payment state: {payment_state}')
+        output.append(f'Something wrong! payment state: {payment_state}\n')
+        #print(f'Something wrong! payment state: {payment_state}')
 
 
 
