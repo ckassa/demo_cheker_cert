@@ -4,12 +4,12 @@ from . import rekurent_pay
 from . import fiscal_cash_pay
 import config
 from src.manager import do_alarm
-import logging
+from loguru import logger
 
-logging.basicConfig(format=u'%(filename)s [LINE:%(lineno)d] #%(levelname)-8s [%(asctime)s]  %(message)s',
-                    level=logging.INFO, filename='log/collector.log')
+logger.add(f'log/{__name__}.log', format='{time} {level} {message}', level='DEBUG', rotation='10 MB', compression='zip')
 
 
+@logger.catch()
 def main():
     try:
         # Сначала сбросим все что есть в выходных данных (чтоб не было дублей)
@@ -44,11 +44,7 @@ def main():
 
     except KeyboardInterrupt:
         print('Program stopped')
-    #except Exception as e:
-    #    t_alarmtext = f'tg_mon_bot (app.py): {str(e)}'
-    #    do_alarm(t_alarmtext)
-    #    logger.error(f'Other except error Exception', exc_info=True)
-
-
-
-
+    except Exception as e:
+        t_alarmtext = f'tg_mon_bot (app.py): {str(e)}'
+        do_alarm(t_alarmtext)
+        logger.error(f'Other except error Exception', exc_info=True)

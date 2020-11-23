@@ -5,6 +5,9 @@ import time
 import hashlib
 import random
 from extentions.demo_checker import app
+from loguru import logger
+
+logger.add(f'log/{__name__}.log', format='{time} {level} {message}', level='DEBUG', rotation='10 MB', compression='zip')
 
 
 s = requests.Session()

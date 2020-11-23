@@ -6,6 +6,10 @@ import time
 import hashlib
 import random
 from datetime import datetime
+from loguru import logger
+
+logger.add(f'log/{__name__}.log', format='{time} {level} {message}', level='DEBUG', rotation='10 MB', compression='zip')
+
 
 s = requests.Session()
 sert_path = 'extentions/demo_checker/src/cert.pem'
