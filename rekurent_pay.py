@@ -1,7 +1,7 @@
 import requests
 import json
 import os
-from .src import config
+from src import config
 import time
 import hashlib
 import random
@@ -12,19 +12,17 @@ logger.add(f'log/{__name__}.log', format='{time} {level} {message}', level='DEBU
 
 
 s = requests.Session()
-sert_path = 'extentions/demo_checker/src/cert.pem'
-key_path = 'extentions/demo_checker/src/dec.key'
+sert_path = 'src/cert.pem'
+key_path = 'src/dec.key'
 # Приватный ключ через тектсовик я вытащил из серта pem, затем командой
 # "openssl rsa -in my.key_encrypted -out my.key_decrypted" (со вводом пароля) расшифровал закрытый ключ
 s.cert = (sert_path, key_path)
 user = {}  # Для записи локальных переменных в глобальную
 json_headers = {'Content-Type': 'application/json'}
-rekurrent_pay_output = []
 
 
 def user_registration():
-    #print('Check method /user/registration...', end='')
-    rekurrent_pay_output.append('/user/registration...')
+    print('Check method /user/registration...', end='')
     url = config.user_registration_rek_url
     login = '7902' + f'{random.randint(1000000, 9999999)}'
     payload = {
@@ -40,17 +38,14 @@ def user_registration():
     payload['sign'] = sign
     request = s.post(url, data=json.dumps(payload), headers=json_headers).json()  # тут есть login, userToken
     if request['login'] == login:
-        #print('OK')
-        rekurrent_pay_output.append('OK\n')
+        print('OK')
     else:
-        #print(f'Something wrong! url: {url}, request: {request}')
-        rekurrent_pay_output.append(f'Something wrong! url: {url}, request: {request}\n')
+        print(f'Something wrong! url: {url}, request: {request}')
     user['login'] = login
 
 
 def get_user_status():
-    #print('Check method /user/status...', end='')
-    rekurrent_pay_output.append('/user/status...')
+    print('Check method /user/status...', end='')
     url = config.user_status_rek_url
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
@@ -66,11 +61,9 @@ def get_user_status():
     request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
 
     if request['state'] == 'active':
-        #print('OK')
-        rekurrent_pay_output.append('OK\n')
+        print('OK')
     else:
-        #print(f'Something wrong! url: {url}, request: {request}')
-        rekurrent_pay_output.append(f'Something wrong! url: {url}, request: {request}\n')
+        print(f'Something wrong! url: {url}, request: {request}')
     userToken = request['userToken']
     user['userToken'] = userToken  # Записываем в глобальную переменную
 
@@ -90,21 +83,17 @@ def get_cards_rek():
     payload['sign'] = sign
 
     request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
-    #print('Check method /get/cards...', end='')
-    rekurrent_pay_output.append('/get/cards...')
+    print('Check method /get/cards...', end='')
     cards = request['cards']
     user['cards'] = cards  # Записал в глобальную переменную
     if cards != '':
-        #print('OK')
-        rekurrent_pay_output.append('OK\n')
+        print('OK')
     else:
-        #print(f'Something wrong! url: {url} request: {request}')
-        rekurrent_pay_output.append(f'Something wrong! url: {url} request: {request}\n')
+        print(f'Something wrong! url: {url} request: {request}')
 
 
 def card_registration():
-    #print('Check method /card/registration...', end='')
-    rekurrent_pay_output.append('/card/registration...')
+    print('Check method /card/registration...', end='')
     url = config.card_registration_url_rek
     payload = {
         "sign": "C5A5386EBADC3D0574CCB7A81820698A",
@@ -147,11 +136,9 @@ def card_registration():
     reg_request = s.post(reg_url, data=reg_payload, headers=reg_headers)
 
     if reg_request.status_code == 200:
-        #print('OK')
-        rekurrent_pay_output.append('OK\n')
+        print('OK')
     else:
-        #print(f'Something wrong! url: {url} request: {reg_request}')
-        rekurrent_pay_output.append(f'Something wrong! url: {url} request: {reg_request}\n')
+        print(f'Something wrong! url: {url} request: {reg_request}')
 
 
 def do_payment():
@@ -159,9 +146,8 @@ def do_payment():
     url = config.do_payment_rek_url
     try:
         cardToken = user['cards'][0]['cardToken']  # Берем первую привязанную карту
-    except IndexError:
-        #print('IndexError... No cards. Start method /card/registration...')
-        rekurrent_pay_output.append('IndexError... No cards. Start method /card/registration...\n')
+    except IndexError:  # Если карт нет, то регаем новую и берем ее
+        print('IndexError... No cards. Start method /card/registration...')
         card_registration()
         cardToken = user['cards'][0]['cardToken']
     payload = {
@@ -188,18 +174,78 @@ def do_payment():
     pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
-    #print('Check method /do/payment...', end='')
-    rekurrent_pay_output.append('/do/payment...')
+    print('Check method /do/payment...', end='')
     request = (s.post(url, data=json.dumps(payload), headers=json_headers)).json()
     regPayNum = request['regPayNum']
 
     user['regPayNum'] = regPayNum  # Записал в глобальную переменную
     if regPayNum:
-        #print('OK')
-        rekurrent_pay_output.append('OK\n')
+        print('OK')
     else:
-        #print(f'Something wrong! url: {url} request: {request}')
-        rekurrent_pay_output.append(f'Something wrong! url: {url} request: {request}\n')
+        print(f'Something wrong! url: {url} request: {request}')
+
+
+def do_payment_rezerv():
+
+    url = config.do_payment_rezerv_rek_url
+    try:
+        cardToken = user['cards'][0]['cardToken']  # Берем первую привязанную карту
+    except IndexError:  # Если карт нет, то регаем новую и берем ее
+        print('IndexError... No cards. Start method /card/registration...')
+        card_registration()
+        cardToken = user['cards'][0]['cardToken']
+    payload = {
+        'serviceCode': f'{config.service_code}',
+        'userToken': f'{user["userToken"]}',
+        'amount': '3000',
+        "comission": "0",
+        "cardToken": f"{cardToken}",
+        'holdTtl': '1800',
+        "properties": [
+            {
+                "name": "ПОЗЫВНОЙ",
+                "value": f"{random.randint(10, 20)}"
+            }
+        ],
+        "shopToken": f"{config.shopToken}"
+    }
+    sign_str = payload['serviceCode'] + '&' + payload['userToken'] + '&' + payload['amount'] + '&' + \
+               payload['comission'] + '&' + payload['cardToken'] + '&' + payload['holdTtl'] + '&' + \
+               payload['properties'][0]['name'] + '&' + payload['properties'][0]['value'] + '&' + \
+               payload['shopToken'] + '&' + config.sec_key
+    pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
+    sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
+    payload['sign'] = sign
+    print('Check method /do/payment-rezerv...', end='')
+    request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
+    regPayNumRezerv = request["regPayNum"]
+    user['regPayNumRezerv'] = regPayNumRezerv   # Записал номер созданного платежа в глобальную переменную
+    if regPayNumRezerv:
+        print('OK')
+    else:
+        print(f'Something wrong! url: {url} request: {request}')
+
+
+def update_pers_acc():
+    url = config.update_pers_acc_rek_url
+    payload = {
+        "regPayNum": f"{user['regPayNumRezerv']}",
+        "value": [
+            {
+                "name": "ПОЗЫВНОЙ",
+                "value": f"{random.randint(10, 20)}"
+            }
+        ],
+        "shopToken": f"{config.shopToken}"
+    }
+    sign_str = payload['regPayNum'] + '&' + payload['value'][0]['name'] + '&' + payload['value'][0]['value'] + \
+        '&' + payload['shopToken']
+    pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
+    sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
+    payload['sign'] = sign
+    print('Check method /ver2/update/pers-acc...', end='')
+    request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
+    print(f'request: {request}, regPayNumRezerv: {user["regPayNumRezerv"]}')
 
 
 def confirm_pay():
@@ -217,17 +263,14 @@ def confirm_pay():
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
 
-    #print('Check method /provision-services/confirm...', end='')
-    rekurrent_pay_output.append('/provision-services/confirm...')
+    print('Check method /provision-services/confirm...', end='')
     request = (s.post(url, data=json.dumps(payload), headers=json_headers)).json()
     result = request['resultState']
     if result == 'success':
         user['payment_state'] = result
-        #print('OK')
-        rekurrent_pay_output.append('OK\n')
+        print('OK')
     else:
-        #print(f'Something wrong! url: {url} request: {request}')
-        rekurrent_pay_output.append(f'Something wrong! url: {url} request: {request}\n')
+        print(f'Something wrong! url: {url} request: {request}')
 
 
 def get_pay_state():
@@ -243,17 +286,14 @@ def get_pay_state():
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
 
-    #print("Check method /payment/state...", end='')
-    rekurrent_pay_output.append('/payment/state...')
+    print("Check method /payment/state...", end='')
     request = s.post(url, data=json.dumps(payload), headers=json_headers).json()
     payment_state = request['state']
     if payment_state:
-        #print('OK')
-        rekurrent_pay_output.append('OK\n')
+        print('OK')
         user['payment_state'] = payment_state
     else:
-        #print(f'Something wrong! url: {url} request: {request}')
-        rekurrent_pay_output.append(f'Something wrong! url: {url} request: {request}\n')
+        print(f'Something wrong! url: {url} request: {request}')
 
 
 def refund_payment():
@@ -276,16 +316,13 @@ def refund_payment():
     pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
-    #print('Check method /provision-services/refund...', end='')
-    rekurrent_pay_output.append('/provision-services/refund...')
+    print('Check method /provision-services/refund...', end='')
     request = (s.post(url, data=json.dumps(payload), headers=json_headers)).json()
     result = request['resultState']
     if result == 'success':
-        #print('OK')
-        rekurrent_pay_output.append('OK\n')
+        print('OK')
     else:
-        #print(f'Something wrong! url: {url} request: {request}')
-        rekurrent_pay_output.append(f'Something wrong! url: {url} request: {request}\n')
+        print(f'Something wrong! url: {url} request: {request}')
 
 
 def card_deactivation():
@@ -303,15 +340,13 @@ def card_deactivation():
     pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
-    #print('Check method /card/deatcivation...', end='')
-    rekurrent_pay_output.append('/card/deatcivation...')
+    print('Check method /card/deatcivation...', end='')
     request = (s.post(url, data=json.dumps(payload), headers=json_headers)).json()
     result = request['resultState']
     if result == 'success':
-        #print('OK')
-        rekurrent_pay_output.append('OK\n')
+        print('OK')
     else:
-        #print(f'Something wrong! url: {url} request: {request}')
-        rekurrent_pay_output.append(f'Something wrong! url: {url} request: {request}\n')
+        print(f'Something wrong! url: {url} request: {request}')
+
 
 
