@@ -5,7 +5,9 @@ import random
 import requests
 import os
 import time
+from loguru import logger
 
+logger.add(f'log/{__name__}.log', format='{time} {level} {message}', level='DEBUG', rotation='10 MB', compression='zip')
 s = requests.Session()
 sert_path = 'extentions/demo_checker/src/cert.pem'
 key_path = 'extentions/demo_checker/src/dec.key'
@@ -18,32 +20,36 @@ output = []
 
 def create_anonimus_pay():
     #print('Check method /do/payment/anonymous...', end='')
+    output.append('\nCheck fiscal_cash methods...\n\n')
     output.append('/do/payment/anonymous...')
     url = config.anonimus_pay_url
     payload = {
         "sign": "16088965AB36DAA41E401BD948E13BBC",
-        "serviceCode": "15636-15727-1",
+        "serviceCode": "111-16124-1",
         "amount": "2500",
         "comission": "0",
         "payType": "fiscalCash",
         "properties": [
             {
-                "name": "ТЕЛЕФОН",
-                "value": f"{random.randint(9000000000, 9999999999)}"
+                "name": "Л_СЧЕТ",
+                "value": f"7902{random.randint(100000, 999999)}"
             },
             {
-                "name": "ФИО",
-                "value": "Тестов Тест Тестович"
+                'name': 'automatNumber',
+                'value': 'test_automatNumber'
             },
             {
-                "name": "АДРЕС",
-                "value": "Тестовый адрес"
+                'name': 'settlementPlace',
+                'value': 'test_settlementPlace'
             }
+
         ],
         "shopToken": "1a4c0d33-010c-4365-9c65-4c7f9bb415d5"
     }
+    #logger.info(f'Л_СЧЕТ: {payload["properties"][0]["value"]}')
     # Рассчет подписи
-    sign_str = payload['serviceCode'] + '&' + payload['amount'] + '&' + payload['comission'] + '&' + payload['payType'] + '&' + payload['properties'][0]['name'] + '&' + payload['properties'][0]['value'] + '&' + payload['properties'][1]['name'] + '&' + payload['properties'][1]['value'] + '&' + payload['properties'][2]['name'] + '&' + payload['properties'][2]['value'] + '&' + payload['shopToken'] + '&' + config.sec_key
+    sign_str = payload['serviceCode'] + '&' + payload['amount'] + '&' + payload['comission'] + '&' + payload['payType']\
+    + '&' + payload['properties'][0]['name'] + '&' + payload['properties'][0]['value'] + '&' + payload['properties'][1]['name'] + '&' + payload['properties'][1]['value'] + '&' + payload['properties'][2]['name'] + '&' + payload['properties'][2]['value'] + '&' + payload['shopToken'] + '&' + config.sec_key
     pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
@@ -54,47 +60,51 @@ def create_anonimus_pay():
     }
     r = s.post(url, data=json.dumps(payload), headers=headers)
     request = r.json()
-    regPayNum = request['regPayNum']
-    user['regPayNum'] = regPayNum
-    if regPayNum != '':
-        #print('OK')
+    try:
+        regPayNum = request['regPayNum']
+        user['regPayNum'] = regPayNum
+        # print('OK')
         output.append('OK\n')
-    else:
+    except KeyError:
         #print(f'Something wrong! Key Error. Url: {url}, request: {request}')
-        output.append(f'Something wrong! Key Error. Url: {url}, request: {request}\n')
+        output.append(f'Something wrong! Key Error. Url: {url}\nrequest: {request}\n')
 
 
 def check_pay_status():
     url = config.payment_state_url
     #print('Check payment state...', end='')
     output.append('Check payment state...')
-    payload = {
-        "sign": "AE13A1572E1A3594A0A956EB751D7F6D",
-        "regPayNum": f"{user['regPayNum']}",
-        "shopToken": f"{config.shopToken}"
-    }
-    headers = {
-        "Content-Type": "application/json"
-    }
-    sign_str = payload['regPayNum'] + '&' + payload['shopToken'] + '&' + config.sec_key
-    pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
-    sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
-    payload['sign'] = sign
+    try:
+        regPayNum = user['regPayNum']  # Вывел в исключение, т.к. без него скрипт ляжет
+        payload = {
+            "sign": "AE13A1572E1A3594A0A956EB751D7F6D",
+            "regPayNum": f"{regPayNum}",
+            "shopToken": f"{config.shopToken}"
+        }
+        headers = {
+            "Content-Type": "application/json"
+        }
+        sign_str = payload['regPayNum'] + '&' + payload['shopToken'] + '&' + config.sec_key
+        pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
+        sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
+        payload['sign'] = sign
 
-    r = s.post(url, data=json.dumps(payload), headers=headers)
-    request = r.json()
-    payment_state = request['state']
-    if payment_state == 'payed':
-        #print('OK')
-        output.append('OK\n')
-    elif payment_state == 'created':
-        #print(f' Warn: Payment state: {payment_state}. Retry...')
-        output.append(f' Warn: Payment state: {payment_state}. Retry...\n')
-        time.sleep(5)
-        check_pay_status()
-    else:
-        #print(f'Something wrong! payment state: {payment_state} Request: {request}')
-        output.append(f'Something wrong! payment state: {payment_state} Request: {request}\n')
+        r = s.post(url, data=json.dumps(payload), headers=headers)
+        request = r.json()
+        payment_state = request['state']
+        if payment_state == 'payed':
+            #print('OK')
+            output.append('OK\n')
+        elif payment_state == 'created':
+            #print(f' Warn: Payment state: {payment_state}. Retry...')
+            output.append(f' Warn: Payment state: {payment_state}. Retry...\n')
+            time.sleep(5)
+            check_pay_status()
+        else:
+            #print(f'Something wrong! payment state: {payment_state} Request: {request}')
+            output.append(f'Something wrong!\npayment state: {payment_state}\nRequest: {request}\n')
+    except KeyError:  # Если нет regPayNum, значит он не записался предыдущей функцией и надо рассказать об ошибке
+        output.append(f'Error check payment state - i have no regPayNum\n')
 
 
 def get_fiscal_check():
@@ -102,25 +112,29 @@ def get_fiscal_check():
     headers = {
         "Content-Type": "application/json"
     }
-    payload = {
-        "sign": "AE13A1572E1A3594A0A956EB751D7F6D",
-        "regPayNum": f"{user['regPayNum']}",
-        "shopToken": f"{config.shopToken}"
-    }
-    # Рассчет подписи
-    sign_str = payload['regPayNum'] + '&' + payload['shopToken'] + '&' + config.sec_key
-    pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
-    sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
-    payload['sign'] = sign
-    #print('Check method /receipt-fiscal...', end='')
     output.append('/receipt-fiscal...')
-    r = s.post(url, data=json.dumps(payload), headers=headers)
-    request = r.json()
-    fiscal_url = request['fiscalUrl']
-    if fiscal_url:
-        #print(f'OK')
-        output.append('OK\n')
-    else:
-        #print(f'Something wrong! Key Error. Url: {url}, request: {request}')
-        output.append(f'Something wrong! Key Error. Url: {url}, request: {request}\n')
+    try:
+        payload = {
+            "sign": "AE13A1572E1A3594A0A956EB751D7F6D",
+            "regPayNum": f"{user['regPayNum']}",
+            "shopToken": f"{config.shopToken}"
+        }
+        # Рассчет подписи
+        sign_str = payload['regPayNum'] + '&' + payload['shopToken'] + '&' + config.sec_key
+        pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
+        sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
+        payload['sign'] = sign
+        #print('Check method /receipt-fiscal...', end='')
+
+        r = s.post(url, data=json.dumps(payload), headers=headers)
+        request = r.json()
+        fiscal_url = request['fiscalUrl']
+        if fiscal_url:
+            #print(f'OK')
+            output.append('OK\n')
+        else:
+            #print(f'Something wrong! Key Error. Url: {url}, request: {request}')
+            output.append(f'**Something wrong!** Key Error. **Url:** {url}\n**request:** {request}\n')
+    except KeyError:
+        output.append(f'Error get fiscal check - i have no regPayNum\n')
 
