@@ -1,10 +1,11 @@
 import requests
+from requests.exceptions import HTTPError
 import json
 from .src import config
 import time
 import hashlib
 import random
-from extentions.demo_checker import app
+from extentions.demo_checker import demo_checker
 from loguru import logger
 
 logger.add(f'log/{__name__}.log', format='{time} {level} {message}', level='DEBUG', rotation='10 MB', compression='zip')
@@ -21,8 +22,9 @@ user = {}  # Для записи локальных переменных в гл
 output = []
 
 
+#@logger.catch()
 def create_anonimus_pay():
-    #print('Check method /do/payment/anonymous...', end='')
+    logger.info('Check method /do/payment/anonymous...')
     output.append('\nCheck anonimus payment methods:\n\n')
     output.append('/do/payment/anonymous...')
     url = config.anonimus_pay_url
@@ -49,7 +51,14 @@ def create_anonimus_pay():
         "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0",
     }
     r = s.post(url, data=json.dumps(payload), headers=headers)
-    request = r.json()
+    #logger.info(f'r.text: {r.text}')
+
+    if r.status_code == 200:
+        request = r.json()
+    else:
+        output.append(f'create_anonimus_pay. request status code: {r.status_code}')
+        logger.error(f'create_anonimus_pay. request status code: {r.status_code}')
+        raise HTTPError
 
     try:
         user['sign'] = request['sign']
@@ -74,7 +83,7 @@ def create_anonimus_pay():
 
 
 def payment_created_pay():
-    #print('Trying to payment created pay')
+    logger.info('Trying to payment created pay')
     output.append('Trying to payment created pay...\nSent a POST request...\n')
     order = user['payUrl'].replace('https://demo-acq.bisys.ru/cardpay/card?order=', '')
     payload = {
@@ -105,7 +114,7 @@ def payment_created_pay():
 
 def check_pay_status():
     url = config.payment_state_url
-    #print('Check payment state...', end='')
+    logger.info('Check payment state...')
     output.append('Check payment state...')
     payload = {
         "sign": "AE13A1572E1A3594A0A956EB751D7F6D",
@@ -134,6 +143,3 @@ def check_pay_status():
     else:
         output.append(f'Something wrong! payment state: {payment_state}\n')
         #print(f'Something wrong! payment state: {payment_state}')
-
-
-

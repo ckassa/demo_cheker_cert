@@ -1,4 +1,5 @@
 from .src import config
+from requests.exceptions import HTTPError
 import json
 import hashlib
 import random
@@ -20,7 +21,7 @@ output = []
 
 def create_anonimus_pay():
     #print('Check method /do/payment/anonymous...', end='')
-    output.append('\nCheck fiscal_cash methods...\n\n')
+    output.append('\nCheck fiscal_cash payment methods...\n\n')
     output.append('/do/payment/anonymous...')
     url = config.anonimus_pay_url
     payload = {
@@ -59,7 +60,12 @@ def create_anonimus_pay():
         "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0",
     }
     r = s.post(url, data=json.dumps(payload), headers=headers)
-    request = r.json()
+    if r.status_code == 200:
+        request = r.json()
+    else:
+        output.append(f'create_anonimus_pay. request status code: {r.status_code}')
+        logger.error(f'create_anonimus_pay. request status code: {r.status_code}')
+        raise HTTPError
     try:
         regPayNum = request['regPayNum']
         user['regPayNum'] = regPayNum

@@ -1,4 +1,5 @@
 import requests
+from requests.exceptions import HTTPError
 import json
 import os
 from .src import config
@@ -22,9 +23,10 @@ json_headers = {'Content-Type': 'application/json'}
 output = []
 
 
+@logger.catch()
 def user_registration():
     #print('Check method /user/registration...', end='')
-    output.append('\nCheck rekurrent methods:\n\n')
+    output.append('\nCheck rekurrent payment methods:\n\n')
     output.append('/user/registration...')
     url = config.user_registration_rek_url
     login = '7902' + f'{random.randint(1000000, 9999999)}'
@@ -39,14 +41,22 @@ def user_registration():
     pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
-    request = s.post(url, data=json.dumps(payload), headers=json_headers).json()  # тут есть login, userToken
-    if request['login'] == login:
-        #print('OK')
-        output.append('OK\n')
+
+    r = s.post(url, data=json.dumps(payload), headers=json_headers)  # тут есть login, userToken
+
+    if r.status_code == 200:  # !!! этот кусок не пашет. Если демо ляжет, то в предыдущей строке бот крашнется
+        request = r.json()
+        try:
+            # print('OK')
+            output.append('OK\n')
+            user['login'] = request['login']
+        except KeyError:
+            # print(f'Something wrong! url: {url}, request: {request}')
+            output.append(f'Something wrong! url: {url}, request: {request}\n')
     else:
-        #print(f'Something wrong! url: {url}, request: {request}')
-        output.append(f'Something wrong! url: {url}, request: {request}\n')
-    user['login'] = login
+        output.append(f'create_anonimus_pay. request status code: {r.status_code}')
+        logger.error(f'create_anonimus_pay. request status code: {r.status_code}')
+        raise HTTPError
 
 
 def get_user_status():
