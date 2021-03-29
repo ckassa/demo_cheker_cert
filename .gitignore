@@ -1,2 +1,4 @@
 # Project exclude paths
 /venv/
+/src/cert.pem
+/src/dec.key
