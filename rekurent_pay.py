@@ -311,7 +311,6 @@ def card_deactivation():
     pre_sign = (hashlib.md5(f"{sign_str}".encode('utf-8')).hexdigest()).upper()
     sign = (hashlib.md5(f"{pre_sign}".encode('utf-8')).hexdigest()).upper()
     payload['sign'] = sign
-    #print('Check method /card/deatcivation...', end='')
     request = (s.post(url, data=json.dumps(payload), headers=json_headers)).json()
     result = request['resultState']
     if result == 'success':

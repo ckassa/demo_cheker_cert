@@ -3,7 +3,6 @@ import anonimus_pay
 import rekurent_pay
 import fiscal_cash_pay
 from loguru import logger
-from requests.exceptions import HTTPError
 
 logger.add(f'log/{__name__}.log', format='{time} {level} {message}', level='DEBUG', rotation='10 MB', compression='zip')
 

@@ -17,7 +17,7 @@ user = {'fiscal_retry': 0}
 
 
 def create_anonimus_pay():
-    print('\nCheck method /do/payment/anonymous...\n', end='')
+    print('\nCheck method /do/payment/anonymous...', end='')
     url = config.anonimus_pay_url
     payload = {
         "sign": "16088965AB36DAA41E401BD948E13BBC",
