@@ -10,6 +10,7 @@ logger.add(f'log/{__name__}.log', format='{time} {level} {message}', level='DEBU
 s = requests.Session()
 sert_path = 'src/cert.pem'
 key_path = 'src/dec.key'
+# Сам сертификат выдает support
 # Приватный ключ через тектсовик я вытащил из серта pem, затем командой
 # "openssl rsa -in my.key_encrypted -out my.key_decrypted" (со вводом пароля) расшифровал закрытый ключ
 s.cert = (sert_path, key_path)
